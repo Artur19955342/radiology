@@ -174,7 +174,7 @@ textarea:focus {
 }
 
 .search-input {
-  max-width: 620px;
+  max-width: none;
   height: 46px;
   font-size: 17px;
   font-weight: 650;

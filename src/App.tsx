@@ -185,11 +185,6 @@ function App() {
     }
   }, [])
 
-  const filledCount = useMemo(
-    () => descriptionFields.filter((field) => description[field.id]?.trim()).length,
-    [description, descriptionFields],
-  )
-
   const findingSearchResults = useMemo(() => {
     const query = search.trim().toLowerCase()
 
@@ -543,9 +538,6 @@ function App() {
                   onSelect={(finding) => applyFindingToField(finding)}
                 />
               </div>
-              <span className="status-pill">
-                {filledCount} из {descriptionFields.length}
-              </span>
             </header>
 
             <div className="description-list">
