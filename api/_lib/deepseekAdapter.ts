@@ -14,9 +14,15 @@ type DeepSeekChatResponse = {
   }
 }
 
+type DeepSeekAttempt = {
+  model: string
+  useJsonMode: boolean
+}
+
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
-const MAX_DEEPSEEK_ATTEMPTS = 3
+const FALLBACK_DEEPSEEK_MODEL = 'deepseek-v4-pro'
+const DEFAULT_DEEPSEEK_TIMEOUT_MS = 14000
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -74,17 +80,47 @@ const parseDeepSeekJson = (content: string): AdaptFindingResponse => {
     title: requireString(parsed.title, 'title').trim(),
     description: requireString(parsed.description, 'description').trim(),
     conclusion: requireString(parsed.conclusion, 'conclusion').trim(),
+    source: 'deepseek',
   }
 }
 
+const getRequestTimeoutMs = () => {
+  const configuredTimeout = Number(process.env.DEEPSEEK_TIMEOUT_MS)
+
+  if (Number.isFinite(configuredTimeout) && configuredTimeout >= 3000) {
+    return configuredTimeout
+  }
+
+  return DEFAULT_DEEPSEEK_TIMEOUT_MS
+}
+
+const getAttemptPlan = (): DeepSeekAttempt[] => {
+  const primaryModel = process.env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL
+  const fallbackModel = primaryModel === FALLBACK_DEEPSEEK_MODEL ? DEFAULT_DEEPSEEK_MODEL : FALLBACK_DEEPSEEK_MODEL
+
+  return [
+    { model: primaryModel, useJsonMode: true },
+    { model: primaryModel, useJsonMode: false },
+    { model: fallbackModel, useJsonMode: false },
+  ]
+}
+
+const buildOriginalFallback = (payload: AdaptFindingRequest): AdaptFindingResponse => ({
+  title: payload.title,
+  description: payload.description,
+  conclusion: payload.conclusion,
+  source: 'original',
+  warning: 'ИИ сейчас не смог надежно адаптировать текст. Оставлен исходный вариант; можно повторить позже.',
+})
+
 const buildDeepSeekRequestBody = (
   payload: AdaptFindingRequest,
-  attempt: number,
-  useJsonMode: boolean,
+  attemptIndex: number,
+  attempt: DeepSeekAttempt,
 ) => {
   const messages = buildDeepSeekAdaptMessages(payload)
 
-  if (attempt > 0) {
+  if (attemptIndex > 0) {
     messages.push({
       role: 'user',
       content:
@@ -93,9 +129,9 @@ const buildDeepSeekRequestBody = (
   }
 
   return {
-    model: process.env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL,
+    model: attempt.model,
     messages,
-    ...(useJsonMode
+    ...(attempt.useJsonMode
       ? {
           response_format: {
             type: 'json_object',
@@ -108,28 +144,42 @@ const buildDeepSeekRequestBody = (
   }
 }
 
-const requestDeepSeek = async (
+const requestWithTimeout = async (
   apiKey: string,
   payload: AdaptFindingRequest,
-  attempt: number,
-  useJsonMode: boolean,
+  attemptIndex: number,
+  attempt: DeepSeekAttempt,
 ) => {
-  const response = await fetch(DEEPSEEK_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(buildDeepSeekRequestBody(payload, attempt, useJsonMode)),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), getRequestTimeoutMs())
 
-  const data = (await response.json()) as DeepSeekChatResponse
+  try {
+    const response = await fetch(DEEPSEEK_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(buildDeepSeekRequestBody(payload, attemptIndex, attempt)),
+      signal: controller.signal,
+    })
 
-  if (!response.ok) {
-    throw new Error(data.error?.message || 'DeepSeek не смог обработать запрос.')
+    const data = (await response.json()) as DeepSeekChatResponse
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'DeepSeek не смог обработать запрос.')
+    }
+
+    return data.choices?.[0]?.message?.content?.trim() || ''
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('DeepSeek не ответил за отведенное время.')
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
-
-  return data.choices?.[0]?.message?.content?.trim() || ''
 }
 
 export const adaptFindingWithDeepSeek = async (
@@ -142,28 +192,28 @@ export const adaptFindingWithDeepSeek = async (
   const apiKey = process.env.DEEPSEEK_API_KEY
 
   if (!apiKey) {
-    throw new Error('Не задан DEEPSEEK_API_KEY.')
+    return buildOriginalFallback(payload)
   }
 
   let lastError = 'DeepSeek вернул пустой ответ.'
 
-  for (let attempt = 0; attempt < MAX_DEEPSEEK_ATTEMPTS; attempt += 1) {
-    const useJsonMode = attempt < MAX_DEEPSEEK_ATTEMPTS - 1
-    const content = await requestDeepSeek(apiKey, payload, attempt, useJsonMode)
-
-    if (!content) {
-      lastError = 'DeepSeek вернул пустой ответ.'
-      continue
-    }
-
+  for (const [attemptIndex, attempt] of getAttemptPlan().entries()) {
     try {
+      const content = await requestWithTimeout(apiKey, payload, attemptIndex, attempt)
+
+      if (!content) {
+        lastError = 'DeepSeek вернул пустой ответ.'
+        continue
+      }
+
       return parseDeepSeekJson(content)
     } catch (error) {
-      lastError = error instanceof Error ? error.message : 'DeepSeek вернул некорректный JSON.'
+      lastError = error instanceof Error ? error.message : 'DeepSeek вернул некорректный ответ.'
     }
   }
 
-  throw new Error(lastError)
+  console.warn('DeepSeek adaptation fallback:', lastError)
+  return buildOriginalFallback(payload)
 }
 
 export const handleDeepSeekAdaptRequest = async (request: Request) => {

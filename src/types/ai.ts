@@ -12,4 +12,6 @@ export type AdaptFindingResponse = {
   title: string
   description: string
   conclusion: string
+  source?: 'deepseek' | 'original'
+  warning?: string
 }

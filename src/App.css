@@ -533,6 +533,13 @@ input:focus-visible {
   line-height: 1.35;
 }
 
+.finding-variant-ai-notice {
+  margin: 0;
+  color: #8a5a00;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .variant-field {
   position: relative;
   display: grid;

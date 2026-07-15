@@ -33,6 +33,7 @@ function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) 
   const [adaptedFinding, setAdaptedFinding] = useState<AdaptFindingResponse | null>(null)
   const [isAdapting, setIsAdapting] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [aiNotice, setAiNotice] = useState('')
 
   const renderedDescription = applyNumberParameters(
     finding.description,
@@ -52,6 +53,7 @@ function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) 
   useEffect(() => {
     setAdaptedFinding(null)
     setAiError('')
+    setAiNotice('')
   }, [finding.title, localization, renderedConclusion, renderedDescription])
 
   const adaptWithAi = async () => {
@@ -64,6 +66,7 @@ function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) 
 
     setIsAdapting(true)
     setAiError('')
+    setAiNotice('')
 
     try {
       const result = await adaptFindingWithAi({
@@ -75,8 +78,13 @@ function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) 
       })
 
       setAdaptedFinding(result)
+      setAiNotice(result.warning || '')
     } catch (error) {
-      setAiError(error instanceof Error ? error.message : 'Не удалось адаптировать находку.')
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : 'ИИ сейчас недоступен. Вариант можно вставить без адаптации или повторить позже.',
+      )
     } finally {
       setIsAdapting(false)
     }
@@ -115,6 +123,7 @@ function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) 
 
       <LocalizationInput value={localization} onChange={setLocalization} />
       {aiError && <p className="finding-variant-ai-error">{aiError}</p>}
+      {aiNotice && <p className="finding-variant-ai-notice">{aiNotice}</p>}
 
       {numberParameters.length > 0 && (
         <div className="variant-number-grid" aria-label="Числовые параметры">

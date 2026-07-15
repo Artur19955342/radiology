@@ -5,6 +5,7 @@ type AdaptFindingApiResponse = {
 }
 
 const ADAPT_FINDING_ENDPOINT = '/api/ai/adapt-finding'
+const AI_REQUEST_TIMEOUT_MS = 50000
 
 const getErrorMessage = async (response: Response) => {
   try {
@@ -16,18 +17,32 @@ const getErrorMessage = async (response: Response) => {
 }
 
 export const adaptFindingWithAi = async (payload: AdaptFindingRequest) => {
-  const response = await fetch(ADAPT_FINDING_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS)
 
-  if (!response.ok) {
-    throw new Error(await getErrorMessage(response))
+  try {
+    const response = await fetch(ADAPT_FINDING_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response))
+    }
+
+    const data = (await response.json()) as AdaptFindingApiResponse
+    return data.result
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('ИИ отвечает слишком долго. Вариант можно вставить без адаптации или повторить позже.')
+    }
+
+    throw error
+  } finally {
+    window.clearTimeout(timeoutId)
   }
-
-  const data = (await response.json()) as AdaptFindingApiResponse
-  return data.result
 }
