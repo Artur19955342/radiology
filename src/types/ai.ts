@@ -15,3 +15,35 @@ export type AdaptFindingResponse = {
   source?: 'deepseek' | 'original'
   warning?: string
 }
+
+export type GenerateFindingSection = {
+  id: string
+  title: string
+}
+
+export type GenerateFindingRequest = {
+  query: string
+  sections: GenerateFindingSection[]
+}
+
+export type GenerateFindingReadyResponse = {
+  status: 'ready'
+  title: string
+  description: string
+  conclusion: string
+  sectionId: string
+  sectionTitle: string
+  differential?: string[]
+  source?: 'deepseek_pro'
+}
+
+export type GenerateFindingClarificationResponse = {
+  status: 'needs_clarification'
+  question: string
+  suggestions?: string[]
+  source?: 'deepseek_pro' | 'fallback'
+}
+
+export type GenerateFindingResponse =
+  | GenerateFindingReadyResponse
+  | GenerateFindingClarificationResponse

@@ -12,8 +12,10 @@ import FindingSearchResults from './components/FindingSearchResults'
 import SectionFindingMenu from './components/SectionFindingMenu'
 import TemplateModal from './components/TemplateModal'
 import TemplatePickerModal from './components/TemplatePickerModal'
+import { generateFindingWithAi } from './data/aiApi'
 import { createFinding, loadFindings } from './data/findingsRepository'
 import { createTemplate, loadTemplates } from './data/templatesRepository'
+import type { GenerateFindingReadyResponse, GenerateFindingResponse } from './types/ai'
 import type { CreateReportFindingPayload, ReportFinding } from './types/findings'
 import type {
   CreateReportTemplatePayload,
@@ -112,6 +114,9 @@ function App() {
   const [description, setDescription] = useState(() => createEmptyDescription(defaultDescriptionFields))
   const [conclusion, setConclusion] = useState('')
   const [search, setSearch] = useState('')
+  const [generatedFinding, setGeneratedFinding] = useState<GenerateFindingResponse | null>(null)
+  const [generateError, setGenerateError] = useState('')
+  const [isGeneratingFinding, setIsGeneratingFinding] = useState(false)
   const [descriptionHeight, setDescriptionHeight] = useState(58)
   const [isResizing, setIsResizing] = useState(false)
   const [templates, setTemplates] = useState<ReportTemplate[]>([])
@@ -195,6 +200,11 @@ function App() {
       .slice(0, 8)
   }, [findings, search])
 
+  const descriptionSections = useMemo(
+    () => descriptionFields.map((field) => ({ id: field.id, title: field.title })),
+    [descriptionFields],
+  )
+
   const stackStyle: ReportStackStyle = {
     '--description-height': `${descriptionHeight}%`,
   }
@@ -212,7 +222,15 @@ function App() {
     setOpenMenuFieldId(null)
     setSectionContentLinks({})
     setSearch('')
+    setGeneratedFinding(null)
+    setGenerateError('')
     setIsTemplatePickerOpen(false)
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setGeneratedFinding(null)
+    setGenerateError('')
   }
 
   const applyFindingToField = (finding: ReportFinding, fieldId = activeFieldId) => {
@@ -266,6 +284,53 @@ function App() {
     setActiveFieldId(targetFieldId)
     setOpenMenuFieldId(null)
     setSearch('')
+    setGeneratedFinding(null)
+    setGenerateError('')
+  }
+
+  const generateFindingFromSearch = async () => {
+    const query = search.trim()
+
+    if (!query) {
+      return
+    }
+
+    setIsGeneratingFinding(true)
+    setGenerateError('')
+    setGeneratedFinding(null)
+
+    try {
+      const result = await generateFindingWithAi({
+        query,
+        sections: descriptionSections,
+      })
+      setGeneratedFinding(result)
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error
+          ? error.message
+          : 'ИИ сейчас недоступен. Уточните запрос или повторите позже.',
+      )
+    } finally {
+      setIsGeneratingFinding(false)
+    }
+  }
+
+  const applyGeneratedFinding = (finding: GenerateFindingReadyResponse) => {
+    setDescription((current) => ({
+      ...current,
+      [finding.sectionId]: appendTextBlock(current[finding.sectionId] || '', finding.description),
+    }))
+
+    if (finding.conclusion.trim()) {
+      setConclusion((current) => appendTextBlock(current, finding.conclusion))
+    }
+
+    setActiveFieldId(finding.sectionId)
+    setOpenMenuFieldId(null)
+    setSearch('')
+    setGeneratedFinding(null)
+    setGenerateError('')
   }
 
   const captureDescriptionSelection = (
@@ -418,10 +483,22 @@ function App() {
                   type="search"
                   value={search}
                   placeholder="Поиск по описанию и находкам..."
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void generateFindingFromSearch()
+                    }
+                  }}
                 />
                 <FindingSearchResults
+                  query={search}
                   findings={findingSearchResults}
+                  generatedFinding={generatedFinding}
+                  generateError={generateError}
+                  isGenerating={isGeneratingFinding}
+                  onGenerate={() => void generateFindingFromSearch()}
+                  onApplyGenerated={applyGeneratedFinding}
                   onSelect={(finding) => applyFindingToField(finding)}
                 />
               </div>

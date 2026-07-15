@@ -442,7 +442,7 @@ input:focus-visible {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  z-index: 20;
+  z-index: 45;
   width: min(620px, 100%);
   max-height: 470px;
   display: grid;
@@ -473,6 +473,109 @@ input:focus-visible {
 .finding-search-list {
   display: grid;
   gap: 8px;
+}
+
+.ai-search-panel {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.finding-search-list + .ai-search-panel {
+  margin-top: 2px;
+}
+
+.ai-search-generate {
+  justify-self: start;
+  min-height: 36px;
+  padding: 7px 12px;
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.ai-search-generate:hover {
+  background: var(--primary-hover);
+}
+
+.ai-search-result {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--input-bg);
+}
+
+.ai-search-result p,
+.ai-search-result strong {
+  margin: 0;
+}
+
+.ai-search-result strong {
+  color: var(--heading);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.ai-search-result-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-search-result-header > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.ai-search-result-header button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 6px 10px;
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.ai-section-pill {
+  justify-self: start;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.2;
+  background: #eef7f4;
+}
+
+.ai-preview {
+  color: var(--heading);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ai-preview.muted {
+  color: var(--muted-strong);
+}
+
+.differential-list,
+.suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.differential-list span,
+.suggestion-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted-strong);
+  background: #ffffff;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .finding-variant-option {

@@ -3,6 +3,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { handleDeepSeekAdaptRequest } from './api/_lib/deepseekAdapter.js'
+import { handleGenerateFindingRequest } from './api/_lib/freeFindingGenerator.js'
 
 const readRawBody = (request: IncomingMessage) =>
   new Promise<string>((resolve, reject) => {
@@ -30,27 +31,34 @@ const toHeaders = (headers: IncomingMessage['headers']) => {
   return nextHeaders
 }
 
-const localDeepSeekApi = (): Plugin => ({
-  name: 'local-deepseek-api',
-  configureServer(server) {
-    server.middlewares.use('/api/ai/adapt-finding', async (request, response, next) => {
-      try {
-        const method = request.method || 'GET'
-        const body = method === 'GET' || method === 'HEAD' ? undefined : await readRawBody(request)
-        const apiResponse = await handleDeepSeekAdaptRequest(
-          new Request('http://localhost/api/ai/adapt-finding', {
-            method,
-            headers: toHeaders(request.headers),
-            body,
-          }),
-        )
+const localAiRoutes = new Map([
+  ['/api/ai/adapt-finding', handleDeepSeekAdaptRequest],
+  ['/api/ai/generate-finding', handleGenerateFindingRequest],
+])
 
-        response.statusCode = apiResponse.status
-        apiResponse.headers.forEach((value, key) => response.setHeader(key, value))
-        response.end(await apiResponse.text())
-      } catch (error) {
-        next(error as Error)
-      }
+const localAiApi = (): Plugin => ({
+  name: 'local-ai-api',
+  configureServer(server) {
+    localAiRoutes.forEach((handler, route) => {
+      server.middlewares.use(route, async (request, response, next) => {
+        try {
+          const method = request.method || 'GET'
+          const body = method === 'GET' || method === 'HEAD' ? undefined : await readRawBody(request)
+          const apiResponse = await handler(
+            new Request(`http://localhost${route}`, {
+              method,
+              headers: toHeaders(request.headers),
+              body,
+            }),
+          )
+
+          response.statusCode = apiResponse.status
+          apiResponse.headers.forEach((value, key) => response.setHeader(key, value))
+          response.end(await apiResponse.text())
+        } catch (error) {
+          next(error as Error)
+        }
+      })
     })
   },
 })
@@ -58,7 +66,7 @@ const localDeepSeekApi = (): Plugin => ({
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    localDeepSeekApi(),
+    localAiApi(),
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
