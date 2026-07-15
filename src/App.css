@@ -111,6 +111,7 @@ h3 {
 }
 
 .description-list {
+  isolation: isolate;
   min-height: 0;
   display: grid;
   gap: 14px;
@@ -119,6 +120,8 @@ h3 {
 }
 
 .description-row {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
   gap: 12px;
@@ -127,6 +130,10 @@ h3 {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-bg);
+}
+
+.description-row.menu-open {
+  z-index: 80;
 }
 
 input,
@@ -224,12 +231,12 @@ input:focus-visible {
 
 .field-menu-wrap {
   position: relative;
-  z-index: 4;
+  z-index: 90;
 }
 
 .section-menu {
   position: absolute;
-  z-index: 8;
+  z-index: 100;
   top: 54px;
   left: 0;
   width: 380px;
@@ -474,30 +481,17 @@ input:focus-visible {
   background: var(--input-bg);
 }
 
-.section-content-option {
-  display: grid;
-  gap: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px;
-  background: var(--input-bg);
-}
-
-.section-content-option-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-}
-
 .section-content-title {
+  width: 100%;
   min-height: 34px;
   justify-content: flex-start;
   overflow: hidden;
-  border-color: transparent;
-  padding: 6px 8px;
+  border-color: var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
   color: var(--heading);
-  background: transparent;
+  background: var(--input-bg);
+  font-size: 14px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -505,13 +499,6 @@ input:focus-visible {
 
 .section-content-title:hover {
   background: #eef7f4;
-}
-
-.section-content-apply {
-  min-height: 34px;
-  padding: 6px 9px;
-  color: #ffffff;
-  background: var(--primary);
 }
 
 .finding-variant-header {

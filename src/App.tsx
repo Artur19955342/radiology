@@ -460,7 +460,10 @@ function App() {
 
             <div className="description-list">
               {descriptionFields.map((field) => (
-                <div className="description-row" key={field.id}>
+                <div
+                  className={`description-row${openMenuFieldId === field.id ? ' menu-open' : ''}`}
+                  key={field.id}
+                >
                   <div className="field-menu-wrap">
                     <button
                       type="button"
