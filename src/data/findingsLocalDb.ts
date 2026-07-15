@@ -17,6 +17,8 @@ export const createLocalFinding = async (payload: CreateReportFindingPayload) =>
   const title = payload.title.trim()
   const description = payload.description.trim()
   const conclusion = payload.conclusion.trim()
+  const sectionId = payload.kind === 'section_content' ? payload.sectionId?.trim() : undefined
+  const sectionTitle = payload.kind === 'section_content' ? payload.sectionTitle?.trim() : undefined
 
   if (!title) {
     throw new Error('Укажите название.')
@@ -30,6 +32,10 @@ export const createLocalFinding = async (payload: CreateReportFindingPayload) =>
     throw new Error('Выберите тип записи.')
   }
 
+  if (payload.kind === 'section_content' && !sectionId) {
+    throw new Error('Для содержимого раздела нужна привязка к разделу.')
+  }
+
   const now = new Date().toISOString()
   const finding: ReportFinding = {
     id: createLocalId(),
@@ -37,6 +43,8 @@ export const createLocalFinding = async (payload: CreateReportFindingPayload) =>
     description,
     conclusion,
     kind: payload.kind,
+    ...(sectionId ? { sectionId } : {}),
+    ...(sectionTitle ? { sectionTitle } : {}),
     createdAt: now,
     updatedAt: now,
   }

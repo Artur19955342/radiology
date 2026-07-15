@@ -14,6 +14,8 @@ type FindingRow = {
   description: string
   conclusion: string
   kind: FindingKind
+  sectionId: string | null
+  sectionTitle: string | null
   createdAt: string
   updatedAt: string
 }
@@ -26,6 +28,8 @@ const normalizeRow = (row: FindingRow): ReportFinding => ({
   description: row.description,
   conclusion: row.conclusion,
   kind: row.kind,
+  ...(row.sectionId ? { sectionId: row.sectionId } : {}),
+  ...(row.sectionTitle ? { sectionTitle: row.sectionTitle } : {}),
   createdAt: new Date(row.createdAt).toISOString(),
   updatedAt: new Date(row.updatedAt).toISOString(),
 })
@@ -40,10 +44,15 @@ const ensureFindingsTable = async () => {
       description TEXT NOT NULL DEFAULT '',
       conclusion TEXT NOT NULL DEFAULT '',
       kind TEXT NOT NULL CHECK (kind IN ('finding', 'section_content')),
+      section_id TEXT,
+      section_title TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `
+
+  await sql`ALTER TABLE report_findings ADD COLUMN IF NOT EXISTS section_id TEXT`
+  await sql`ALTER TABLE report_findings ADD COLUMN IF NOT EXISTS section_title TEXT`
 }
 
 export const validateFindingPayload = (payload: unknown): CreateReportFindingPayload => {
@@ -55,6 +64,9 @@ export const validateFindingPayload = (payload: unknown): CreateReportFindingPay
   const title = typeof candidate.title === 'string' ? candidate.title.trim() : ''
   const description = typeof candidate.description === 'string' ? candidate.description.trim() : ''
   const conclusion = typeof candidate.conclusion === 'string' ? candidate.conclusion.trim() : ''
+  const sectionId = typeof candidate.sectionId === 'string' ? candidate.sectionId.trim() : ''
+  const sectionTitle =
+    typeof candidate.sectionTitle === 'string' ? candidate.sectionTitle.trim() : ''
   const kind = candidate.kind
 
   if (!title) {
@@ -69,11 +81,16 @@ export const validateFindingPayload = (payload: unknown): CreateReportFindingPay
     throw new Error('Выберите тип записи.')
   }
 
+  if (kind === 'section_content' && !sectionId) {
+    throw new Error('Для содержимого раздела нужна привязка к разделу.')
+  }
+
   return {
     title,
     description,
     conclusion,
     kind,
+    ...(kind === 'section_content' ? { sectionId, sectionTitle } : {}),
   }
 }
 
@@ -88,6 +105,8 @@ export const listFindings = async () => {
       description,
       conclusion,
       kind,
+      section_id AS "sectionId",
+      section_title AS "sectionTitle",
       created_at::text AS "createdAt",
       updated_at::text AS "updatedAt"
     FROM report_findings
@@ -102,16 +121,20 @@ export const insertFinding = async (payload: CreateReportFindingPayload) => {
 
   const sql = getSql()
   const id = randomUUID()
+  const sectionId = payload.sectionId ?? null
+  const sectionTitle = payload.sectionTitle ?? null
 
   const [row] = await sql<FindingRow[]>`
-    INSERT INTO report_findings (id, title, description, conclusion, kind)
-    VALUES (${id}, ${payload.title}, ${payload.description}, ${payload.conclusion}, ${payload.kind})
+    INSERT INTO report_findings (id, title, description, conclusion, kind, section_id, section_title)
+    VALUES (${id}, ${payload.title}, ${payload.description}, ${payload.conclusion}, ${payload.kind}, ${sectionId}, ${sectionTitle})
     RETURNING
       id,
       title,
       description,
       conclusion,
       kind,
+      section_id AS "sectionId",
+      section_title AS "sectionTitle",
       created_at::text AS "createdAt",
       updated_at::text AS "updatedAt"
   `

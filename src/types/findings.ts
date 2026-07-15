@@ -6,6 +6,8 @@ export type ReportFinding = {
   description: string
   conclusion: string
   kind: FindingKind
+  sectionId?: string
+  sectionTitle?: string
   createdAt: string
   updatedAt: string
 }
@@ -15,4 +17,6 @@ export type CreateReportFindingPayload = {
   description: string
   conclusion: string
   kind: FindingKind
+  sectionId?: string
+  sectionTitle?: string
 }

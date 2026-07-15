@@ -93,6 +93,18 @@ const matchesFindingSearch = (finding: ReportFinding, query: string) =>
   finding.description.toLowerCase().includes(query) ||
   finding.conclusion.toLowerCase().includes(query)
 
+const belongsToSection = (finding: ReportFinding, field: DescriptionField) => {
+  if (finding.kind !== 'section_content') {
+    return false
+  }
+
+  if (finding.sectionId) {
+    return finding.sectionId === field.id
+  }
+
+  return finding.sectionTitle === field.title || finding.title === field.title
+}
+
 function App() {
   const stackRef = useRef<HTMLDivElement>(null)
   const [descriptionFields, setDescriptionFields] = useState(defaultDescriptionFields)
@@ -185,7 +197,9 @@ function App() {
       return []
     }
 
-    return findings.filter((finding) => matchesFindingSearch(finding, query)).slice(0, 8)
+    return findings
+      .filter((finding) => finding.kind === 'finding' && matchesFindingSearch(finding, query))
+      .slice(0, 8)
   }, [findings, search])
 
   const stackStyle: ReportStackStyle = {
@@ -300,6 +314,8 @@ function App() {
       ...current,
       title: current.title || field.title,
       description: selectedText,
+      sectionId: field.id,
+      sectionTitle: field.title,
     }))
   }
 
@@ -336,7 +352,23 @@ function App() {
     setFindingSaveError('')
 
     try {
-      const savedFinding = await createFinding(findingDraft)
+      const activeField =
+        descriptionFields.find((field) => field.id === (findingDraft.sectionId || activeFieldId)) ||
+        descriptionFields[0]
+      const payload =
+        findingDraft.kind === 'section_content'
+          ? {
+              ...findingDraft,
+              sectionId: findingDraft.sectionId || activeField?.id,
+              sectionTitle: findingDraft.sectionTitle || activeField?.title,
+            }
+          : {
+              ...findingDraft,
+              sectionId: undefined,
+              sectionTitle: undefined,
+            }
+
+      const savedFinding = await createFinding(payload)
       setFindings((currentFindings) => [
         savedFinding,
         ...currentFindings.filter((finding) => finding.id !== savedFinding.id),
@@ -443,7 +475,8 @@ function App() {
                     </button>
                     {openMenuFieldId === field.id && (
                       <SectionFindingMenu
-                        findings={findings}
+                        findings={findings.filter((finding) => belongsToSection(finding, field))}
+                        sectionTitle={field.title}
                         onSelect={(finding) => applyFindingToField(finding, field.id)}
                       />
                     )}
