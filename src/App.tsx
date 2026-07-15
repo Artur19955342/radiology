@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import AiFindingDraftPanel, { type AiFindingDraft } from './components/AiFindingDraftPanel'
 import FindingCapturePanel from './components/FindingCapturePanel'
 import FindingSearchResults from './components/FindingSearchResults'
 import SectionFindingMenu from './components/SectionFindingMenu'
@@ -15,7 +16,7 @@ import TemplatePickerModal from './components/TemplatePickerModal'
 import { generateFindingWithAi } from './data/aiApi'
 import { createFinding, loadFindings } from './data/findingsRepository'
 import { createTemplate, loadTemplates } from './data/templatesRepository'
-import type { GenerateFindingReadyResponse, GenerateFindingResponse } from './types/ai'
+import type { GenerateFindingClarificationResponse } from './types/ai'
 import type { CreateReportFindingPayload, ReportFinding } from './types/findings'
 import type {
   CreateReportTemplatePayload,
@@ -114,7 +115,8 @@ function App() {
   const [description, setDescription] = useState(() => createEmptyDescription(defaultDescriptionFields))
   const [conclusion, setConclusion] = useState('')
   const [search, setSearch] = useState('')
-  const [generatedFinding, setGeneratedFinding] = useState<GenerateFindingResponse | null>(null)
+  const [aiFindingDraft, setAiFindingDraft] = useState<AiFindingDraft | null>(null)
+  const [aiClarification, setAiClarification] = useState<GenerateFindingClarificationResponse | null>(null)
   const [generateError, setGenerateError] = useState('')
   const [isGeneratingFinding, setIsGeneratingFinding] = useState(false)
   const [descriptionHeight, setDescriptionHeight] = useState(58)
@@ -222,14 +224,15 @@ function App() {
     setOpenMenuFieldId(null)
     setSectionContentLinks({})
     setSearch('')
-    setGeneratedFinding(null)
+    setAiFindingDraft(null)
+    setAiClarification(null)
     setGenerateError('')
     setIsTemplatePickerOpen(false)
   }
 
   const handleSearchChange = (value: string) => {
     setSearch(value)
-    setGeneratedFinding(null)
+    setAiClarification(null)
     setGenerateError('')
   }
 
@@ -284,8 +287,13 @@ function App() {
     setActiveFieldId(targetFieldId)
     setOpenMenuFieldId(null)
     setSearch('')
-    setGeneratedFinding(null)
+    setAiFindingDraft(null)
+    setAiClarification(null)
     setGenerateError('')
+  }
+
+  const updateAiFindingDraft = (patch: Partial<AiFindingDraft>) => {
+    setAiFindingDraft((current) => (current ? { ...current, ...patch } : current))
   }
 
   const generateFindingFromSearch = async () => {
@@ -297,14 +305,32 @@ function App() {
 
     setIsGeneratingFinding(true)
     setGenerateError('')
-    setGeneratedFinding(null)
+    setAiClarification(null)
 
     try {
       const result = await generateFindingWithAi({
         query,
         sections: descriptionSections,
       })
-      setGeneratedFinding(result)
+
+      if (result.status === 'ready') {
+        setAiFindingDraft({
+          title: result.title,
+          sectionId: result.sectionId || activeFieldId || descriptionSections[0]?.id || '',
+          description: result.description,
+          conclusion: result.conclusion,
+          differential: result.differential ?? [],
+        })
+      } else {
+        setAiClarification(result)
+        setAiFindingDraft({
+          title: query,
+          sectionId: activeFieldId || descriptionSections[0]?.id || '',
+          description: '',
+          conclusion: '',
+          differential: [],
+        })
+      }
     } catch (error) {
       setGenerateError(
         error instanceof Error
@@ -316,21 +342,36 @@ function App() {
     }
   }
 
-  const applyGeneratedFinding = (finding: GenerateFindingReadyResponse) => {
-    setDescription((current) => ({
-      ...current,
-      [finding.sectionId]: appendTextBlock(current[finding.sectionId] || '', finding.description),
-    }))
+  const clearAiFindingDraft = () => {
+    setAiFindingDraft(null)
+    setAiClarification(null)
+    setGenerateError('')
+  }
 
-    if (finding.conclusion.trim()) {
-      setConclusion((current) => appendTextBlock(current, finding.conclusion))
+  const applyGeneratedFinding = () => {
+    if (!aiFindingDraft) {
+      return
     }
 
-    setActiveFieldId(finding.sectionId)
+    const targetFieldId = aiFindingDraft.sectionId || activeFieldId || descriptionFields[0]?.id
+
+    if (!targetFieldId) {
+      return
+    }
+
+    setDescription((current) => ({
+      ...current,
+      [targetFieldId]: appendTextBlock(current[targetFieldId] || '', aiFindingDraft.description),
+    }))
+
+    if (aiFindingDraft.conclusion.trim()) {
+      setConclusion((current) => appendTextBlock(current, aiFindingDraft.conclusion))
+    }
+
+    setActiveFieldId(targetFieldId)
     setOpenMenuFieldId(null)
     setSearch('')
-    setGeneratedFinding(null)
-    setGenerateError('')
+    clearAiFindingDraft()
   }
 
   const captureDescriptionSelection = (
@@ -494,11 +535,11 @@ function App() {
                 <FindingSearchResults
                   query={search}
                   findings={findingSearchResults}
-                  generatedFinding={generatedFinding}
+                  clarification={aiClarification}
                   generateError={generateError}
                   isGenerating={isGeneratingFinding}
+                  hasDraft={Boolean(aiFindingDraft)}
                   onGenerate={() => void generateFindingFromSearch()}
-                  onApplyGenerated={applyGeneratedFinding}
                   onSelect={(finding) => applyFindingToField(finding)}
                 />
               </div>
@@ -596,6 +637,18 @@ function App() {
             isSaving={isFindingSaving}
             onChange={setFindingDraft}
             onSave={handleSaveFinding}
+          />
+
+          <AiFindingDraftPanel
+            draft={aiFindingDraft}
+            sections={descriptionSections}
+            clarification={aiClarification}
+            error={generateError}
+            isGenerating={isGeneratingFinding}
+            onChange={updateAiFindingDraft}
+            onApply={applyGeneratedFinding}
+            onClear={clearAiFindingDraft}
+            onRetry={() => void generateFindingFromSearch()}
           />
 
           <div className="panel-group">
