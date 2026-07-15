@@ -34,7 +34,7 @@ export type GenerateFindingReadyResponse = {
   sectionId: string
   sectionTitle: string
   differential?: string[]
-  source?: 'deepseek_pro'
+  source?: 'deepseek_pro' | 'fallback'
 }
 
 export type GenerateFindingClarificationResponse = {

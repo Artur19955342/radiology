@@ -7,7 +7,7 @@ import type {
   GenerateFindingResponse,
   GenerateFindingSection,
 } from '../../src/types/ai.js'
-import { buildFreeFindingMessages } from './freeFindingPrompt.js'
+import { buildFreeFindingMessages, getFreeFindingRoutingHint } from './freeFindingPrompt.js'
 
 type DeepSeekChatResponse = {
   choices?: Array<{
@@ -121,6 +121,34 @@ const buildClarification = (
   suggestions,
   source: 'deepseek_pro',
 })
+
+const buildGuidedFallback = (
+  payload: GenerateFindingRequest,
+): GenerateFindingReadyResponse | null => {
+  const routingHint = getFreeFindingRoutingHint(payload)
+
+  if (!routingHint) {
+    return null
+  }
+
+  return {
+    status: 'ready',
+    sectionId: routingHint.sectionId,
+    sectionTitle: routingHint.sectionTitle,
+    title: 'Гиподенсивная область',
+    description:
+      'В веществе головного мозга определяется гиподенсивная область. Денситометрические характеристики и распространенность требуют сопоставления с клиническими данными и при необходимости уточнения по МРТ или КТ в динамике.',
+    conclusion:
+      'Гиподенсивная область головного мозга. Дифференциальный ряд: ишемические изменения, постишемические кистозно-глиозные изменения, воспалительные изменения, объемное образование.',
+    differential: [
+      'Ишемические изменения',
+      'Постишемические кистозно-глиозные изменения',
+      'Воспалительные изменения',
+      'Объемное образование',
+    ],
+    source: 'fallback',
+  }
+}
 
 const parseGeneratedFinding = (
   content: string,
@@ -282,13 +310,26 @@ export const generateFindingWithDeepSeekPro = async (
         continue
       }
 
-      return parseGeneratedFinding(content, payload)
+      const result = parseGeneratedFinding(content, payload)
+
+      if (result.status === 'needs_clarification' && getFreeFindingRoutingHint(payload)) {
+        lastError = result.question
+        continue
+      }
+
+      return result
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'DeepSeek Pro вернул некорректный ответ.'
     }
   }
 
   console.warn('DeepSeek Pro free finding fallback:', lastError)
+  const guidedFallback = buildGuidedFallback(payload)
+
+  if (guidedFallback) {
+    return guidedFallback
+  }
+
   return {
     status: 'needs_clarification',
     question: 'ИИ не смог надежно разобрать находку. Уточните формулировку или раздел протокола.',
