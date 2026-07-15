@@ -11,6 +11,7 @@ import FindingCapturePanel from './components/FindingCapturePanel'
 import FindingSearchResults from './components/FindingSearchResults'
 import SectionFindingMenu from './components/SectionFindingMenu'
 import TemplateModal from './components/TemplateModal'
+import TemplatePickerModal from './components/TemplatePickerModal'
 import { createFinding, loadFindings } from './data/findingsRepository'
 import { createTemplate, loadTemplates } from './data/templatesRepository'
 import type { CreateReportFindingPayload, ReportFinding } from './types/findings'
@@ -117,8 +118,6 @@ function App() {
   const [templatesError, setTemplatesError] = useState('')
   const [isTemplatesLoading, setIsTemplatesLoading] = useState(true)
   const [findings, setFindings] = useState<ReportFinding[]>([])
-  const [findingsError, setFindingsError] = useState('')
-  const [isFindingsLoading, setIsFindingsLoading] = useState(true)
   const [findingDraft, setFindingDraft] = useState<CreateReportFindingPayload>(emptyFindingDraft)
   const [findingSaveError, setFindingSaveError] = useState('')
   const [isFindingSaving, setIsFindingSaving] = useState(false)
@@ -126,6 +125,7 @@ function App() {
   const [openMenuFieldId, setOpenMenuFieldId] = useState<string | null>(null)
   const [, setSectionContentLinks] = useState<Record<string, SectionContentLink>>({})
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -165,16 +165,9 @@ function App() {
 
         if (isMounted) {
           setFindings(loadedFindings)
-          setFindingsError('')
         }
-      } catch (error) {
-        if (isMounted) {
-          setFindingsError(error instanceof Error ? error.message : 'Не удалось загрузить находки.')
-        }
-      } finally {
-        if (isMounted) {
-          setIsFindingsLoading(false)
-        }
+      } catch {
+        // Search and section menus remain empty when the local store is unavailable.
       }
     }
 
@@ -210,27 +203,6 @@ function App() {
     setDescription((current) => ({ ...current, [id]: value }))
   }
 
-  const clearAll = () => {
-    setDescription(createEmptyDescription(descriptionFields))
-    setConclusion('')
-    setSearch('')
-    setOpenMenuFieldId(null)
-    setSectionContentLinks({})
-  }
-
-  const buildConclusion = () => {
-    const hasFindings = Object.values(description).some((value) => {
-      const text = value.toLowerCase()
-      return text.includes('очаг') || text.includes('инфильт') || text.includes('выпот')
-    })
-
-    setConclusion(
-      hasFindings
-        ? 'Выявленные изменения требуют клинико-рентгенологической корреляции.'
-        : 'Данных за свежие очаговые и инфильтративные изменения не выявлено.',
-    )
-  }
-
   const applyTemplate = (template: ReportTemplate) => {
     const nextFields = templateToFields(template)
     setDescriptionFields(nextFields)
@@ -240,6 +212,7 @@ function App() {
     setOpenMenuFieldId(null)
     setSectionContentLinks({})
     setSearch('')
+    setIsTemplatePickerOpen(false)
   }
 
   const applyFindingToField = (finding: ReportFinding, fieldId = activeFieldId) => {
@@ -374,7 +347,6 @@ function App() {
         ...currentFindings.filter((finding) => finding.id !== savedFinding.id),
       ])
       setFindingDraft(emptyFindingDraft)
-      setFindingsError('')
     } catch (error) {
       setFindingSaveError(error instanceof Error ? error.message : 'Не удалось сохранить запись.')
     } finally {
@@ -550,65 +522,12 @@ function App() {
           />
 
           <div className="panel-group">
+            <button type="button" onClick={() => setIsTemplatePickerOpen(true)}>
+              Выбрать шаблон
+            </button>
             <button type="button" onClick={() => setIsTemplateModalOpen(true)}>
               Создать шаблон
             </button>
-            <button type="button" onClick={buildConclusion}>
-              Собрать заключение
-            </button>
-            <button type="button" onClick={clearAll}>
-              Очистить все
-            </button>
-          </div>
-
-          <div className="panel-group template-library">
-            <h3>Шаблоны</h3>
-            {isTemplatesLoading && <p className="panel-muted">Загрузка шаблонов...</p>}
-            {templatesError && <p className="panel-alert">{templatesError}</p>}
-            {!isTemplatesLoading && !templatesError && templates.length === 0 && (
-              <p className="panel-muted">Пока нет сохраненных шаблонов.</p>
-            )}
-            <div className="template-list">
-              {templates.map((template) => (
-                <button
-                  type="button"
-                  className="template-button"
-                  key={template.id}
-                  onClick={() => applyTemplate(template)}
-                >
-                  <span>{template.title}</span>
-                  <small>{template.sections.length} раздела</small>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel-group template-library">
-            <h3>База записей</h3>
-            {isFindingsLoading && <p className="panel-muted">Загрузка записей...</p>}
-            {findingsError && <p className="panel-alert">{findingsError}</p>}
-            {!isFindingsLoading && !findingsError && findings.length === 0 && (
-              <p className="panel-muted">Пока нет сохраненных находок.</p>
-            )}
-            <div className="template-list">
-              {findings.slice(0, 6).map((finding) => (
-                <button
-                  type="button"
-                  className="template-button"
-                  key={finding.id}
-                  onClick={() => applyFindingToField(finding)}
-                >
-                  <span>{finding.title}</span>
-                  <small>{finding.kind === 'finding' ? 'Находка' : 'Содержимое раздела'}</small>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel-note">
-            <span>Черновик</span>
-            <strong>{filledCount}</strong>
-            <small>заполненных раздела</small>
           </div>
         </aside>
       </main>
@@ -617,6 +536,14 @@ function App() {
         open={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
         onCreate={handleCreateTemplate}
+      />
+      <TemplatePickerModal
+        open={isTemplatePickerOpen}
+        templates={templates}
+        isLoading={isTemplatesLoading}
+        error={templatesError}
+        onClose={() => setIsTemplatePickerOpen(false)}
+        onSelect={applyTemplate}
       />
     </>
   )

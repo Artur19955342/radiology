@@ -392,14 +392,16 @@ input:focus-visible {
   padding-right: 4px;
 }
 
-.template-button {
+.template-button,
+.template-picker-button {
   display: grid;
   gap: 4px;
   justify-items: start;
   text-align: left;
 }
 
-.template-button span {
+.template-button span,
+.template-picker-button span {
   max-width: 100%;
   overflow: hidden;
   color: var(--heading);
@@ -408,6 +410,7 @@ input:focus-visible {
 }
 
 .template-button small,
+.template-picker-button small,
 .panel-muted {
   color: var(--muted);
   font-size: 13px;
@@ -683,6 +686,18 @@ input:focus-visible {
   color: var(--heading);
   font-size: 34px;
   line-height: 1;
+}
+
+.template-picker-modal {
+  width: min(640px, 100%);
+}
+
+.template-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(520px, calc(100svh - 220px));
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .modal-backdrop {
