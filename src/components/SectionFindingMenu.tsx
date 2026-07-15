@@ -1,5 +1,5 @@
 import type { ReportFinding } from '../types/findings'
-import FindingVariantOption from './FindingVariantOption'
+import SectionContentOption from './SectionContentOption'
 
 type SectionFindingMenuProps = {
   findings: ReportFinding[]
@@ -14,7 +14,7 @@ function SectionFindingMenu({ findings, sectionTitle, onSelect }: SectionFinding
         <p className="panel-muted">Нет сохраненного содержимого для этого раздела.</p>
       ) : (
         findings.map((finding) => (
-          <FindingVariantOption key={finding.id} finding={finding} onSelect={onSelect} />
+          <SectionContentOption key={finding.id} finding={finding} onSelect={onSelect} />
         ))
       )}
     </div>
