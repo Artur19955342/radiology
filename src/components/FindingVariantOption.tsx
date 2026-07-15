@@ -7,6 +7,8 @@ import LocalizationInput from './LocalizationInput'
 
 type FindingVariantOptionProps = {
   finding: ReportFinding
+  isActive: boolean
+  onActivate: () => void
   onSelect: (finding: ReportFinding) => void
 }
 
@@ -15,7 +17,12 @@ const kindLabel = {
   section_content: 'Содержимое раздела',
 } as const
 
-function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) {
+function FindingVariantOption({
+  finding,
+  isActive,
+  onActivate,
+  onSelect,
+}: FindingVariantOptionProps) {
   const numberParameters = useMemo(
     () => [
       ...findNumberParameters(finding.description, 'description'),
@@ -100,54 +107,67 @@ function FindingVariantOption({ finding, onSelect }: FindingVariantOptionProps) 
   }
 
   return (
-    <article className="finding-variant-option">
+    <article
+      className={`finding-variant-option${isActive ? ' active-variant' : ''}`}
+      aria-selected={isActive}
+      role="option"
+      onClick={isActive ? undefined : onActivate}
+      onFocus={onActivate}
+      onMouseEnter={onActivate}
+    >
       <header className="finding-variant-header">
         <div>
           <strong>{activeTitle}</strong>
           <small>{kindLabel[finding.kind]}</small>
         </div>
-        <div className="finding-variant-actions">
-          <button
-            className="ai-action"
-            type="button"
-            disabled={isAdapting || !localization.trim()}
-            onClick={adaptWithAi}
-          >
-            {isAdapting ? 'ИИ...' : 'ИИ'}
-          </button>
-          <button type="button" onClick={applyVariant}>
-            Вставить
-          </button>
-        </div>
+        {isActive && (
+          <div className="finding-variant-actions">
+            <button
+              className="ai-action"
+              type="button"
+              disabled={isAdapting || !localization.trim()}
+              onClick={adaptWithAi}
+            >
+              {isAdapting ? 'ИИ...' : 'ИИ'}
+            </button>
+            <button type="button" onClick={applyVariant}>
+              Вставить
+            </button>
+          </div>
+        )}
       </header>
 
-      <LocalizationInput value={localization} onChange={setLocalization} />
-      {aiError && <p className="finding-variant-ai-error">{aiError}</p>}
-      {aiNotice && <p className="finding-variant-ai-notice">{aiNotice}</p>}
+      {isActive && (
+        <>
+          <LocalizationInput value={localization} onChange={setLocalization} />
+          {aiError && <p className="finding-variant-ai-error">{aiError}</p>}
+          {aiNotice && <p className="finding-variant-ai-notice">{aiNotice}</p>}
 
-      {numberParameters.length > 0 && (
-        <div className="variant-number-grid" aria-label="Числовые параметры">
-          {numberParameters.map((parameter) => (
-            <label className="variant-field compact" key={parameter.id}>
-              <span>
-                {parameter.target === 'description' ? 'Описание' : 'Заключение'} {parameter.order}
-              </span>
-              <input
-                value={numberValues[parameter.id] ?? parameter.value}
-                onChange={(event) =>
-                  setNumberValues((current) => ({
-                    ...current,
-                    [parameter.id]: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          ))}
-        </div>
+          {numberParameters.length > 0 && (
+            <div className="variant-number-grid" aria-label="Числовые параметры">
+              {numberParameters.map((parameter) => (
+                <label className="variant-field compact" key={parameter.id}>
+                  <span>
+                    {parameter.target === 'description' ? 'Описание' : 'Заключение'} {parameter.order}
+                  </span>
+                  <input
+                    value={numberValues[parameter.id] ?? parameter.value}
+                    onChange={(event) =>
+                      setNumberValues((current) => ({
+                        ...current,
+                        [parameter.id]: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+
+          <p className="finding-variant-preview">{activeDescription}</p>
+          {activeConclusion && <p className="finding-variant-preview muted">{activeConclusion}</p>}
+        </>
       )}
-
-      <p className="finding-variant-preview">{activeDescription}</p>
-      {activeConclusion && <p className="finding-variant-preview muted">{activeConclusion}</p>}
     </article>
   )
 }

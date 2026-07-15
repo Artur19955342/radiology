@@ -662,6 +662,21 @@ textarea:focus-visible {
   background: var(--input-bg);
 }
 
+.finding-variant-option:not(.active-variant) {
+  cursor: pointer;
+}
+
+.finding-variant-option:not(.active-variant):hover {
+  border-color: var(--border-strong);
+  background: #f5faf8;
+}
+
+.finding-variant-option.active-variant {
+  border-color: var(--accent);
+  background: var(--panel-bg);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
 .section-content-title {
   width: 100%;
   min-height: 34px;

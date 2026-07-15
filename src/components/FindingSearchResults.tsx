@@ -5,10 +5,12 @@ import FindingVariantOption from './FindingVariantOption'
 type FindingSearchResultsProps = {
   query: string
   findings: ReportFinding[]
+  activeFindingIndex: number
   clarification: GenerateFindingClarificationResponse | null
   generateError: string
   isGenerating: boolean
   hasDraft: boolean
+  onActiveFindingChange: (index: number) => void
   onGenerate: () => void
   onSelect: (finding: ReportFinding) => void
 }
@@ -16,10 +18,12 @@ type FindingSearchResultsProps = {
 function FindingSearchResults({
   query,
   findings,
+  activeFindingIndex,
   clarification,
   generateError,
   isGenerating,
   hasDraft,
+  onActiveFindingChange,
   onGenerate,
   onSelect,
 }: FindingSearchResultsProps) {
@@ -37,9 +41,15 @@ function FindingSearchResults({
             <span>Найдено в базе</span>
             <small>{findings.length}</small>
           </div>
-          <div className="finding-search-list">
-            {findings.map((finding) => (
-              <FindingVariantOption key={finding.id} finding={finding} onSelect={onSelect} />
+          <div className="finding-search-list" role="listbox" aria-label="Варианты находок">
+            {findings.map((finding, index) => (
+              <FindingVariantOption
+                key={finding.id}
+                finding={finding}
+                isActive={index === activeFindingIndex}
+                onActivate={() => onActiveFindingChange(index)}
+                onSelect={onSelect}
+              />
             ))}
           </div>
         </>

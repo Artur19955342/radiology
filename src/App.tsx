@@ -119,6 +119,7 @@ function App() {
   const [aiClarification, setAiClarification] = useState<GenerateFindingClarificationResponse | null>(null)
   const [generateError, setGenerateError] = useState('')
   const [isGeneratingFinding, setIsGeneratingFinding] = useState(false)
+  const [activeSearchFindingIndex, setActiveSearchFindingIndex] = useState(0)
   const [descriptionHeight, setDescriptionHeight] = useState(58)
   const [isResizing, setIsResizing] = useState(false)
   const [templates, setTemplates] = useState<ReportTemplate[]>([])
@@ -197,6 +198,14 @@ function App() {
       .slice(0, 8)
   }, [findings, search])
 
+  useEffect(() => {
+    setActiveSearchFindingIndex((current) =>
+      findingSearchResults.length === 0
+        ? 0
+        : Math.min(current, findingSearchResults.length - 1),
+    )
+  }, [findingSearchResults.length])
+
   const descriptionSections = useMemo(
     () => descriptionFields.map((field) => ({ id: field.id, title: field.title })),
     [descriptionFields],
@@ -227,8 +236,19 @@ function App() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value)
+    setActiveSearchFindingIndex(0)
     setAiClarification(null)
     setGenerateError('')
+  }
+
+  const moveActiveSearchFinding = (direction: 1 | -1) => {
+    setActiveSearchFindingIndex((current) => {
+      if (findingSearchResults.length === 0) {
+        return 0
+      }
+
+      return (current + direction + findingSearchResults.length) % findingSearchResults.length
+    })
   }
 
   const applyFindingToField = (finding: ReportFinding, fieldId = activeFieldId) => {
@@ -521,6 +541,18 @@ function App() {
                   placeholder="Поиск по описанию и находкам..."
                   onChange={(event) => handleSearchChange(event.target.value)}
                   onKeyDown={(event) => {
+                    if (event.key === 'ArrowDown' && findingSearchResults.length > 0) {
+                      event.preventDefault()
+                      moveActiveSearchFinding(1)
+                      return
+                    }
+
+                    if (event.key === 'ArrowUp' && findingSearchResults.length > 0) {
+                      event.preventDefault()
+                      moveActiveSearchFinding(-1)
+                      return
+                    }
+
                     if (event.key === 'Enter') {
                       event.preventDefault()
                       void generateFindingFromSearch()
@@ -530,10 +562,12 @@ function App() {
                 <FindingSearchResults
                   query={search}
                   findings={findingSearchResults}
+                  activeFindingIndex={activeSearchFindingIndex}
                   clarification={aiClarification}
                   generateError={generateError}
                   isGenerating={isGeneratingFinding}
                   hasDraft={Boolean(aiFindingDraft)}
+                  onActiveFindingChange={setActiveSearchFindingIndex}
                   onGenerate={() => void generateFindingFromSearch()}
                   onSelect={(finding) => applyFindingToField(finding)}
                 />
