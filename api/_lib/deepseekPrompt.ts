@@ -1,4 +1,5 @@
 import type { AdaptFindingRequest } from '../../src/types/ai.js'
+import { formatProtectedNumbersForPrompt } from './numberIntegrity.js'
 
 export type DeepSeekMessage = {
   role: 'system' | 'user'
@@ -10,8 +11,11 @@ export const buildDeepSeekAdaptMessages = (payload: AdaptFindingRequest): DeepSe
     role: 'system',
     content: [
       'Ты помогаешь врачу-рентгенологу адаптировать готовую находку под указанную локализацию.',
-      'Меняй только грамматику, падежи, род, число и согласование.',
-      'Не добавляй новых медицинских фактов, не удаляй смысловые данные и сохраняй числовые значения.',
+      'Разрешено менять только локализацию и грамматическое согласование вокруг локализации.',
+      'Запрещено менять диагноз, смысл, количество находок, размеры, плотность, интенсивность, проценты, даты, степени, стадии и любые числовые значения.',
+      'Все цифры из исходного текста должны остаться в ответе в том же количестве, в том же порядке и в той же записи.',
+      'Не добавляй новые числа и не удаляй существующие числа.',
+      'Если число относится к размеру или измерению, единицу измерения тоже не меняй.',
       'Ответ верни только как непустой json-объект.',
       '',
       'EXAMPLE JSON OUTPUT:',
@@ -24,6 +28,7 @@ export const buildDeepSeekAdaptMessages = (payload: AdaptFindingRequest): DeepSe
       'Адаптируй текст находки под локализацию.',
       '',
       `Локализация: ${payload.localization}`,
+      formatProtectedNumbersForPrompt(payload),
       `Тип записи: ${payload.kind}`,
       `Название: ${payload.title}`,
       '',

@@ -2,6 +2,7 @@
 
 import type { AdaptFindingRequest, AdaptFindingResponse } from '../../src/types/ai.js'
 import { buildDeepSeekAdaptMessages } from './deepseekPrompt.js'
+import { assertNumberIntegrity, formatProtectedNumbersForPrompt } from './numberIntegrity.js'
 
 type DeepSeekChatResponse = {
   choices?: Array<{
@@ -73,15 +74,21 @@ const extractJsonContent = (content: string) => {
   return trimmed
 }
 
-const parseDeepSeekJson = (content: string): AdaptFindingResponse => {
+const parseDeepSeekJson = (
+  content: string,
+  payload: AdaptFindingRequest,
+): AdaptFindingResponse => {
   const parsed = JSON.parse(extractJsonContent(content)) as Partial<AdaptFindingResponse>
-
-  return {
+  const candidate = {
     title: requireString(parsed.title, 'title').trim(),
     description: requireString(parsed.description, 'description').trim(),
     conclusion: requireString(parsed.conclusion, 'conclusion').trim(),
     source: 'deepseek',
-  }
+  } satisfies AdaptFindingResponse
+
+  assertNumberIntegrity(payload, candidate)
+
+  return candidate
 }
 
 const getRequestTimeoutMs = () => {
@@ -110,7 +117,8 @@ const buildOriginalFallback = (payload: AdaptFindingRequest): AdaptFindingRespon
   description: payload.description,
   conclusion: payload.conclusion,
   source: 'original',
-  warning: 'ИИ сейчас не смог надежно адаптировать текст. Оставлен исходный вариант; можно повторить позже.',
+  warning:
+    'ИИ не смог адаптировать текст без гарантии сохранения чисел. Оставлен исходный вариант; можно повторить позже.',
 })
 
 const buildDeepSeekRequestBody = (
@@ -123,8 +131,13 @@ const buildDeepSeekRequestBody = (
   if (attemptIndex > 0) {
     messages.push({
       role: 'user',
-      content:
-        'Предыдущий ответ был пустым или невалидным. Верни непустой json-объект строго в формате {"title":"...","description":"...","conclusion":"..."}. Без markdown, без пояснений.',
+      content: [
+        'Предыдущий ответ был пустым, невалидным или изменил числа.',
+        'Повтори адаптацию, меняя только локализацию и грамматическое согласование вокруг нее.',
+        formatProtectedNumbersForPrompt(payload),
+        'Верни непустой json-объект строго в формате {"title":"...","description":"...","conclusion":"..."}.',
+        'Без markdown, без пояснений.',
+      ].join('\n'),
     })
   }
 
@@ -206,7 +219,7 @@ export const adaptFindingWithDeepSeek = async (
         continue
       }
 
-      return parseDeepSeekJson(content)
+      return parseDeepSeekJson(content, payload)
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'DeepSeek вернул некорректный ответ.'
     }
