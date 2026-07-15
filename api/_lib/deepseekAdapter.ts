@@ -16,6 +16,7 @@ type DeepSeekChatResponse = {
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
+const MAX_DEEPSEEK_ATTEMPTS = 3
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -54,14 +55,81 @@ const validateAdaptFindingPayload = (payload: unknown): AdaptFindingRequest => {
   }
 }
 
+const extractJsonContent = (content: string) => {
+  const trimmed = content.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+
+  if (start >= 0 && end > start) {
+    return trimmed.slice(start, end + 1)
+  }
+
+  return trimmed
+}
+
 const parseDeepSeekJson = (content: string): AdaptFindingResponse => {
-  const parsed = JSON.parse(content) as Partial<AdaptFindingResponse>
+  const parsed = JSON.parse(extractJsonContent(content)) as Partial<AdaptFindingResponse>
 
   return {
     title: requireString(parsed.title, 'title').trim(),
     description: requireString(parsed.description, 'description').trim(),
     conclusion: requireString(parsed.conclusion, 'conclusion').trim(),
   }
+}
+
+const buildDeepSeekRequestBody = (
+  payload: AdaptFindingRequest,
+  attempt: number,
+  useJsonMode: boolean,
+) => {
+  const messages = buildDeepSeekAdaptMessages(payload)
+
+  if (attempt > 0) {
+    messages.push({
+      role: 'user',
+      content:
+        'Предыдущий ответ был пустым или невалидным. Верни непустой json-объект строго в формате {"title":"...","description":"...","conclusion":"..."}. Без markdown, без пояснений.',
+    })
+  }
+
+  return {
+    model: process.env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL,
+    messages,
+    ...(useJsonMode
+      ? {
+          response_format: {
+            type: 'json_object',
+          },
+        }
+      : {}),
+    max_tokens: 1200,
+    temperature: 0,
+    stream: false,
+  }
+}
+
+const requestDeepSeek = async (
+  apiKey: string,
+  payload: AdaptFindingRequest,
+  attempt: number,
+  useJsonMode: boolean,
+) => {
+  const response = await fetch(DEEPSEEK_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(buildDeepSeekRequestBody(payload, attempt, useJsonMode)),
+  })
+
+  const data = (await response.json()) as DeepSeekChatResponse
+
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'DeepSeek не смог обработать запрос.')
+  }
+
+  return data.choices?.[0]?.message?.content?.trim() || ''
 }
 
 export const adaptFindingWithDeepSeek = async (
@@ -77,37 +145,25 @@ export const adaptFindingWithDeepSeek = async (
     throw new Error('Не задан DEEPSEEK_API_KEY.')
   }
 
-  const response = await fetch(DEEPSEEK_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL,
-      messages: buildDeepSeekAdaptMessages(payload),
-      response_format: {
-        type: 'json_object',
-      },
-      max_tokens: 900,
-      temperature: 0.2,
-      stream: false,
-    }),
-  })
+  let lastError = 'DeepSeek вернул пустой ответ.'
 
-  const data = (await response.json()) as DeepSeekChatResponse
+  for (let attempt = 0; attempt < MAX_DEEPSEEK_ATTEMPTS; attempt += 1) {
+    const useJsonMode = attempt < MAX_DEEPSEEK_ATTEMPTS - 1
+    const content = await requestDeepSeek(apiKey, payload, attempt, useJsonMode)
 
-  if (!response.ok) {
-    throw new Error(data.error?.message || 'DeepSeek не смог обработать запрос.')
+    if (!content) {
+      lastError = 'DeepSeek вернул пустой ответ.'
+      continue
+    }
+
+    try {
+      return parseDeepSeekJson(content)
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'DeepSeek вернул некорректный JSON.'
+    }
   }
 
-  const content = data.choices?.[0]?.message?.content
-
-  if (!content) {
-    throw new Error('DeepSeek вернул пустой ответ.')
-  }
-
-  return parseDeepSeekJson(content)
+  throw new Error(lastError)
 }
 
 export const handleDeepSeekAdaptRequest = async (request: Request) => {
