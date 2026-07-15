@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import postgres from 'postgres'
 
 let sqlClient: ReturnType<typeof postgres> | null = null

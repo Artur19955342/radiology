@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import type { AdaptFindingRequest, AdaptFindingResponse } from '../../src/types/ai.js'
 import { buildDeepSeekAdaptMessages } from './deepseekPrompt.js'
 

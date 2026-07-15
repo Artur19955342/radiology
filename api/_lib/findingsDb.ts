@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { randomUUID } from 'node:crypto'
 import type {
   CreateReportFindingPayload,
