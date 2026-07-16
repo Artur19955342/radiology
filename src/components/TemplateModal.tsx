@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { CreateReportTemplatePayload } from '../types/templates'
 
 type TemplateModalProps = {
@@ -22,8 +22,23 @@ const parseDescriptionLines = (description: string): ParsedLine[] =>
       text,
     }))
 
+const getDescriptionLineOrderAtIndex = (description: string, selectionStart: number) => {
+  const rawLines = description.split(/\r?\n/)
+  const activeLineIndex = description.slice(0, selectionStart).split(/\r?\n/).length - 1
+  let order = 0
+
+  for (let index = 0; index <= activeLineIndex; index += 1) {
+    if (rawLines[index]?.trim()) {
+      order += 1
+    }
+  }
+
+  return order
+}
+
+const normalizeTitleSelection = (value: string) => value.replace(/\s+/g, ' ').trim()
+
 function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
-  const [step, setStep] = useState(1)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [conclusion, setConclusion] = useState('')
@@ -38,7 +53,6 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
   }
 
   const resetAndClose = () => {
-    setStep(1)
     setTitle('')
     setDescription('')
     setConclusion('')
@@ -48,7 +62,36 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
     onClose()
   }
 
-  const goToSectionNames = () => {
+  const assignSelectedTextToSectionTitle = (
+    event: ReactKeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    const textarea = event.currentTarget
+    const selectedText = normalizeTitleSelection(
+      textarea.value.slice(textarea.selectionStart, textarea.selectionEnd),
+    )
+
+    if (!selectedText) {
+      return
+    }
+
+    const lineOrder = getDescriptionLineOrderAtIndex(description, textarea.selectionStart)
+
+    if (!lineOrder) {
+      return
+    }
+
+    event.preventDefault()
+    setSectionTitles((current) => ({
+      ...current,
+      [lineOrder]: selectedText,
+    }))
+  }
+
+  const saveTemplate = async () => {
     const templateTitle = title.trim()
 
     if (!templateTitle) {
@@ -61,22 +104,8 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
       return
     }
 
-    setError('')
-    setSectionTitles((current) => {
-      const nextTitles: Record<number, string> = {}
-
-      parsedLines.forEach((line) => {
-        nextTitles[line.order] = current[line.order] || `Раздел ${line.order}`
-      })
-
-      return nextTitles
-    })
-    setStep(2)
-  }
-
-  const saveTemplate = async () => {
     const payload: CreateReportTemplatePayload = {
-      title: title.trim(),
+      title: templateTitle,
       conclusion: conclusion.trim(),
       sections: parsedLines.map((line) => ({
         order: line.order,
@@ -100,7 +129,7 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
   return (
     <div className="modal-backdrop" role="presentation">
       <section
-        className="template-modal"
+        className="template-modal template-builder-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="template-modal-title"
@@ -115,13 +144,8 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
           </button>
         </header>
 
-        <div className="wizard-steps" aria-label="Шаги создания шаблона">
-          <span className={step === 1 ? 'active-step' : ''}>1. Текст</span>
-          <span className={step === 2 ? 'active-step' : ''}>2. Разделы</span>
-        </div>
-
-        {step === 1 ? (
-          <div className="modal-body">
+        <div className="modal-body template-modal-layout">
+          <div className="template-editor-pane">
             <label className="form-field">
               <span>Название</span>
               <input
@@ -137,22 +161,10 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
                 className="template-description-input"
                 value={description}
                 placeholder={'Каждая строка станет отдельным разделом:\nЛегочные поля без инфильтрации.\nПлевральные полости свободны.'}
+                onKeyDown={assignSelectedTextToSectionTitle}
                 onChange={(event) => setDescription(event.target.value)}
               />
             </label>
-
-            <div className="numbered-preview" aria-label="Разделы описания">
-              {parsedLines.length > 0 ? (
-                parsedLines.map((line) => (
-                  <div className="numbered-line" key={`${line.order}-${line.text}`}>
-                    <span>{line.order}</span>
-                    <p>{line.text}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="muted-text">Пока нет строк описания.</p>
-              )}
-            </div>
 
             <label className="form-field">
               <span>Заключение</span>
@@ -164,54 +176,55 @@ function TemplateModal({ open, onClose, onCreate }: TemplateModalProps) {
               />
             </label>
           </div>
-        ) : (
-          <div className="modal-body">
-            <div className="section-title-list">
-              {parsedLines.map((line) => (
-                <div className="section-title-row" key={`${line.order}-${line.text}`}>
-                  <span className="line-badge">{line.order}</span>
-                  <div>
-                    <label className="form-field">
-                      <span>Название раздела</span>
-                      <input
-                        value={sectionTitles[line.order] || ''}
-                        placeholder={`Раздел ${line.order}`}
-                        onChange={(event) =>
-                          setSectionTitles((current) => ({
-                            ...current,
-                            [line.order]: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <p>{line.text}</p>
-                  </div>
-                </div>
-              ))}
+
+          <aside className="template-sections-pane" aria-label="Разделы шаблона">
+            <div className="template-sections-header">
+              <div>
+                <p className="section-kicker">Разделы</p>
+                <h3>Названия</h3>
+              </div>
+              <span>{parsedLines.length}</span>
             </div>
-          </div>
-        )}
+
+            <div className="section-title-list">
+              {parsedLines.length > 0 ? (
+                parsedLines.map((line) => (
+                  <div className="section-title-row" key={`${line.order}-${line.text}`}>
+                    <span className="line-badge">{line.order}</span>
+                    <div>
+                      <label className="form-field section-title-field">
+                        <input
+                          value={sectionTitles[line.order] || ''}
+                          placeholder={`Раздел ${line.order}`}
+                          aria-label={`Название раздела ${line.order}`}
+                          onChange={(event) =>
+                            setSectionTitles((current) => ({
+                              ...current,
+                              [line.order]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <p>{line.text}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="muted-text">Строки описания появятся здесь как разделы.</p>
+              )}
+            </div>
+          </aside>
+        </div>
 
         {error && <div className="modal-error">{error}</div>}
 
         <footer className="modal-actions">
-          {step === 2 && (
-            <button type="button" onClick={() => setStep(1)} disabled={isSaving}>
-              Назад
-            </button>
-          )}
           <button type="button" className="secondary-action" onClick={resetAndClose} disabled={isSaving}>
             Отмена
           </button>
-          {step === 1 ? (
-            <button type="button" className="primary-action" onClick={goToSectionNames}>
-              Далее
-            </button>
-          ) : (
-            <button type="button" className="primary-action" onClick={saveTemplate} disabled={isSaving}>
-              {isSaving ? 'Сохранение...' : 'Сохранить'}
-            </button>
-          )}
+          <button type="button" className="primary-action" onClick={saveTemplate} disabled={isSaving}>
+            {isSaving ? 'Сохранение...' : 'Сохранить'}
+          </button>
         </footer>
       </section>
     </div>

@@ -53,7 +53,8 @@ function FindingVariantOption({
   const activeTitle = adaptedFinding?.title ?? finding.title
   const activeDescription = adaptedFinding?.description ?? renderedDescription
   const activeConclusion = adaptedFinding?.conclusion ?? renderedConclusion
-  const summary = normalizeSummary([activeDescription, activeConclusion].filter(Boolean).join(' '))
+  const descriptionSummary = normalizeSummary(activeDescription)
+  const conclusionSummary = normalizeSummary(activeConclusion)
 
   useEffect(() => {
     setAdaptedFinding(null)
@@ -115,7 +116,10 @@ function FindingVariantOption({
     >
       <header className="finding-variant-header">
         <strong className="finding-variant-title">{activeTitle}</strong>
-        <span className="finding-variant-summary">{summary}</span>
+        <span className="finding-variant-summary">
+          <span>{descriptionSummary}</span>
+          {conclusionSummary && <span>{conclusionSummary}</span>}
+        </span>
         {isActive && (
           <div className="finding-variant-actions">
             <button
