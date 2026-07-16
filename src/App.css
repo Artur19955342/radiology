@@ -510,15 +510,16 @@ textarea:focus-visible {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
+  right: 0;
   z-index: 45;
-  width: min(620px, 100%);
+  width: 100%;
   max-height: 470px;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   background: var(--panel-bg);
   box-shadow: 0 18px 45px rgba(12, 22, 19, 0.16);
 }
@@ -540,7 +541,7 @@ textarea:focus-visible {
 
 .finding-search-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .ai-search-panel {
@@ -655,11 +656,16 @@ textarea:focus-visible {
 
 .finding-variant-option {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px 10px;
   background: var(--input-bg);
+}
+
+.finding-variant-option.active-variant {
+  gap: 7px;
+  padding: 8px;
 }
 
 .finding-variant-option:not(.active-variant) {
@@ -699,9 +705,9 @@ textarea:focus-visible {
 
 .finding-variant-header {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .finding-variant-header div {
@@ -728,14 +734,15 @@ textarea:focus-visible {
 .finding-variant-actions {
   flex: 0 0 auto;
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
 .finding-variant-actions button {
-  min-height: 34px;
-  padding: 6px 10px;
+  min-height: 30px;
+  padding: 5px 9px;
   color: #ffffff;
   background: var(--primary);
+  font-size: 13px;
 }
 
 .finding-variant-actions .ai-action {
@@ -766,19 +773,19 @@ textarea:focus-visible {
 .variant-field {
   position: relative;
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .variant-field input {
-  height: 36px;
-  padding: 7px 9px;
+  height: 32px;
+  padding: 5px 8px;
   font-size: 13px;
 }
 
 .variant-number-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 6px;
 }
 
 .compact-number-grid {
@@ -788,8 +795,8 @@ textarea:focus-visible {
 .finding-variant-preview {
   margin: 0;
   color: var(--heading);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.28;
 }
 
 .finding-variant-preview.muted {
