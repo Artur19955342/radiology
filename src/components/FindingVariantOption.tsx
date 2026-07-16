@@ -12,10 +12,7 @@ type FindingVariantOptionProps = {
   onSelect: (finding: ReportFinding) => void
 }
 
-const kindLabel = {
-  finding: 'Находка',
-  section_content: 'Содержимое раздела',
-} as const
+const normalizeSummary = (value: string) => value.replace(/\s+/g, ' ').trim()
 
 function FindingVariantOption({
   finding,
@@ -56,6 +53,7 @@ function FindingVariantOption({
   const activeTitle = adaptedFinding?.title ?? finding.title
   const activeDescription = adaptedFinding?.description ?? renderedDescription
   const activeConclusion = adaptedFinding?.conclusion ?? renderedConclusion
+  const summary = normalizeSummary([activeDescription, activeConclusion].filter(Boolean).join(' '))
 
   useEffect(() => {
     setAdaptedFinding(null)
@@ -116,10 +114,8 @@ function FindingVariantOption({
       onMouseEnter={onActivate}
     >
       <header className="finding-variant-header">
-        <div>
-          <strong>{activeTitle}</strong>
-          <small>{kindLabel[finding.kind]}</small>
-        </div>
+        <strong className="finding-variant-title">{activeTitle}</strong>
+        <span className="finding-variant-summary">{summary}</span>
         {isActive && (
           <div className="finding-variant-actions">
             <button

@@ -704,28 +704,32 @@ textarea:focus-visible {
 }
 
 .finding-variant-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.finding-variant-header div {
-  min-width: 0;
   display: grid;
-  gap: 2px;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1.5fr);
+  align-items: center;
+  gap: 10px;
 }
 
-.finding-variant-header strong {
+.active-variant .finding-variant-header {
+  grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1.5fr) auto;
+}
+
+.finding-variant-title,
+.finding-variant-summary {
+  min-width: 0;
   overflow: hidden;
-  color: var(--heading);
-  font-size: 14px;
-  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.finding-variant-header small,
+.finding-variant-title {
+  color: var(--heading);
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.finding-variant-summary,
 .variant-field span {
   color: var(--muted);
   font-size: 12px;
@@ -735,6 +739,8 @@ textarea:focus-visible {
   flex: 0 0 auto;
   display: flex;
   gap: 5px;
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .finding-variant-actions button {
